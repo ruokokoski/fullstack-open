@@ -1,2 +1,3 @@
-# fullstack_open_courses
-University of Helsinki Fullstack Open courses
+# Fullstack Open
+
+University of Helsinki Fullstack Open parts 0 - 13
