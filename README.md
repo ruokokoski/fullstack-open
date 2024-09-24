@@ -1,3 +1,3 @@
 # Fullstack Open
 
-University of Helsinki Fullstack Open parts 0 - 13
+This repository contains all parts 0 to 13 of the Fullstack Open courses offered by the University of Helsinki. The parts were carried out over the years 2023-2024.
