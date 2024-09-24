@@ -1,0 +1,94 @@
+name: Deployment pipeline
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize]
+
+jobs:
+  simple_deployment_pipeline:
+    runs-on: ubuntu-20.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - uses: superfly/flyctl-actions/setup-flyctl@master
+      - name: Commit messages
+        env:
+          COMMIT_MESSAGES: ${{ toJson(github.event.commits.*.message) }}
+        run: echo "$COMMIT_MESSAGES"
+
+      - name: Install dependencies for backend
+        run: npm install  
+
+      - name: Lint backend
+        run: npm run lint
+    
+      - name: Run backend tests
+        run: npm test
+
+      - name: Install dependencies for frontend
+        run: |
+          cd frontend
+          npm install
+
+      - name: Lint frontend
+        run: |
+          cd frontend
+          npm run lint
+
+      - name: Run frontend tests
+        run: |
+          cd frontend
+          npm test
+
+      - name: Run build
+        run: |
+          cd frontend
+          npm run build
+
+      - name: Deploy to fly.io
+        if: ${{ github.event_name == 'push' && !contains(join(github.event.commits.*.message), '#skip') }}
+        run: flyctl deploy --remote-only
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+      
+      - name: Deploy success
+        uses: tsickert/discord-webhook@v6.0.0
+        if: ${{ success() && github.event_name == 'push' }}
+        with:
+          webhook-url: ${{ secrets.DISCORD_WEBHOOK }}
+          content: "Success"
+          embed-color: 65280
+          embed-title: "App deploy success"
+          embed-footer-text: "severity: info"
+          username: bot
+        
+      - name: Deploy Failure
+        uses: tsickert/discord-webhook@v6.0.0
+        if: ${{ failure() }}
+        with:
+          webhook-url: ${{ secrets.DISCORD_WEBHOOK }}
+          content: "Failure"
+          embed-color: 16711680
+          embed-title: "Build failed"
+          embed-description: "commit ${{ github.sha }} broke the build"
+          embed-footer-text: "severity: error"
+          username: bot
+
+  tag_release:
+    needs: [simple_deployment_pipeline]
+    runs-on: ubuntu-20.04
+    if: ${{ github.event_name == 'push' && !contains(join(github.event.commits.*.message), '#skip') }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Bump version and push tag
+        uses: anothrNick/github-tag-action@1.70.0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DEFAULT_BUMP: patch
+          WITH_V: true
